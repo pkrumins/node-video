@@ -87,8 +87,8 @@ private:
     ogg_stream_state *ogg_os;
 
 public:
-    FixedVideo(int wwidth, int hheight, int qquality) :
-        width(wwidth), height(hheight), quality(qquality),
+    FixedVideo(int wwidth, int hheight) :
+        width(wwidth), height(hheight), quality(31),
         hadFrame(false), ogg_fp(NULL), td(NULL), ogg_os(NULL) {}
 
     ~FixedVideo() {
@@ -104,6 +104,7 @@ public:
         t->InstanceTemplate()->SetInternalFieldCount(1);
         NODE_SET_PROTOTYPE_METHOD(t, "newFrame", NewFrame);
         NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
+        NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
         NODE_SET_PROTOTYPE_METHOD(t, "end", End);
         target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
     }
@@ -130,6 +131,10 @@ public:
 
     void SetOutputFile(const char *fileName) {
         outputFileName = fileName;
+    }
+
+    void SetQuality(int qquality) {
+        quality = qquality;
     }
 
     void End() {
@@ -321,30 +326,23 @@ protected:
     {
         HandleScope scope;
 
-        if (args.Length() != 3)
-            VException("Three arguments required - width, height and quality");
+        if (args.Length() != 2)
+            VException("Two arguments required - width and height.");
         if (!args[0]->IsInt32())
             VException("First argument must be integer width.");
         if (!args[1]->IsInt32())
             VException("Second argument must be integer height.");
-        if (!args[2]->IsInt32())
-            VException("Third argument must be integer quality.");
 
         int w = args[0]->Int32Value();
         int h = args[1]->Int32Value();
-        int q = args[2]->Int32Value();
 
         if (w < 0)
             VException("Width smaller than 0.");
         if (h < 0)
             VException("Height smaller than 0.");
-        if (q < 0)
-            VException("Quality smaller than 0.");
-        if (q > 63)
-            VException("Quality greater than 63.");
 
-        FixedVideo *v = new FixedVideo(w, h, q);
-        v->Wrap(args.This());
+        FixedVideo *fv = new FixedVideo(w, h);
+        fv->Wrap(args.This());
         return args.This();
     }
 
@@ -390,6 +388,28 @@ protected:
 
         FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
         fv->SetOutputFile(*fileName);
+
+        return Undefined();
+    }
+
+    static Handle<Value>
+    SetQuality(const Arguments &args)
+    {
+        HandleScope scope;
+
+        if (args.Length() != 1) 
+            VException("One argument required - video quality.");
+
+        if (!args[0]->IsInt32())
+            VException("Quality must be integer.");
+
+        int q = args[0]->Int32Value();
+
+        if (q < 0) VException("Quality smaller than 0.");
+        if (q > 63) VException("Quality greater than 63.");
+
+        FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
+        fv->SetQuality(q);
 
         return Undefined();
     }
