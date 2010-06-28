@@ -13,7 +13,7 @@ function baseName(fileName) {
     return fileName.slice(0, fileName.indexOf('.'));
 }
 
-var fixedVideo = new VideoLib.FixedVideo(720, 400, 32); // width, height, quality
+var fixedVideo = new VideoLib.FixedVideo(720, 400); // width, height, quality
 fixedVideo.setOutputFile('video.ogv');
 
 var buf = new Buffer(1152000);
