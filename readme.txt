@@ -41,6 +41,14 @@ The default quality is 31.
 
     video.setQuality(63);   // best video quality
 
+You can also change the frame rate with `setFrameRate`. The default is 25fps,
+to change it do this:
+
+    video.setFrameRate(50);  // frame rate is now 50 fps
+
+Important: All of the above options should be set before submitting the first
+frame.
+
 Now, to start writing video, call `newFrame` method with frames sequentially.
 Frames must be RGBA nodejs Buffer objects.
 

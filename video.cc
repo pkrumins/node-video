@@ -72,7 +72,7 @@ rgb_to_yuv(const unsigned char *rgb, size_t size)
 // FixedVideo class, all frames are of fixed size (no stacking).
 class FixedVideo : public ObjectWrap {
 private:
-    int width, height, quality;
+    int width, height, quality, frameRate;
     std::string outputFileName;
 
     bool hadFrame;
@@ -88,7 +88,7 @@ private:
 
 public:
     FixedVideo(int wwidth, int hheight) :
-        width(wwidth), height(hheight), quality(31),
+        width(wwidth), height(hheight), quality(31), frameRate(25),
         hadFrame(false), ogg_fp(NULL), td(NULL), ogg_os(NULL) {}
 
     ~FixedVideo() {
@@ -105,6 +105,7 @@ public:
         NODE_SET_PROTOTYPE_METHOD(t, "newFrame", NewFrame);
         NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
         NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
+        NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
         NODE_SET_PROTOTYPE_METHOD(t, "end", End);
         target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
     }
@@ -137,6 +138,10 @@ public:
         quality = qquality;
     }
 
+    void SetFrameRate(int fframeRate) {
+        frameRate = fframeRate;
+    }
+
     void End() {
         if (ogg_fp) fclose(ogg_fp);
         if (td) th_encode_free(td);
@@ -152,8 +157,8 @@ private:
         ti.pic_height = height;
         ti.pic_x = 0;
         ti.pic_y = 0;
-        ti.fps_numerator = 0;
-        ti.fps_denominator = 0;
+        ti.fps_numerator = frameRate;
+        ti.fps_denominator = 1;
         ti.aspect_numerator = 0;
         ti.aspect_denominator = 0;
         ti.colorspace = TH_CS_UNSPECIFIED;
@@ -410,6 +415,25 @@ protected:
 
         FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
         fv->SetQuality(q);
+
+        return Undefined();
+    }
+
+    static Handle<Value>
+    SetFrameRate(const Arguments &args)
+    {
+        HandleScope scope;
+
+        if (args.Length() != 1) 
+            VException("Two argument required - frame rate.");
+
+        if (!args[0]->IsInt32())
+            VException("Frame rate must be integer.");
+
+        int rate = args[0]->Int32Value();
+
+        FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
+        fv->SetFrameRate(rate);
 
         return Undefined();
     }
