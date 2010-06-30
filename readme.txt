@@ -70,7 +70,52 @@ file and frees all resources.
 StackedVideo
 ------------
 
-Coming near you soon.
+StackedVideo object is for stacking many small frame updates together and then
+encoding the frame as a whole. Here is how it works. The first frame sent to
+StackedVideo must be a full frame (the width and height must match video's
+width and height). Next, you can either send another full frame for encoding
+or update parts of the last frame. It's useful in a situation like doing a
+screen recording, when only one smart part of the screen updates, you redraw
+just that portion and nothing else.
+
+Must of the usage is just like you'd use FixedVideo object.
+
+First create a StackedVideo object:
+
+    var stackedVideo = new StackedVideo(width, height);
+
+Then set the output file:
+
+    stackedVideo.setOutputFile('./screencast.ogv');
+
+Then set the quality and/or framerate via `setQuality` and `setFrameRate`
+methods.
+
+Now you have to submit a full frame to StackedVideo, do it via regular
+`newFrame` method:
+
+    stackedVideo.newFrame(rgba_frame);
+
+This will encode this frame, and remember it. Now you can use `push` method
+to push an update to the frame. The usage is as following:
+
+    stackedVideo.push(rgba_rectangle, x, y, width, height);
+
+This will put the rectangle of width x height at position (x, y). Make sure
+dimensions don't overflow or you'll get an exception.
+
+After you're done pushing all the updates you wanted, call `endPush`. This
+will encode the frame (and keep the previous frame in memory, so you can `push`
+more stuff):
+
+    stackedVideo.endPush();
+
+When you're totally done with encoding, call the `end` method:
+
+    stackedVideo.end();
+
+That will close all the file handles and free memory. Alternatively you can let
+the `stackedVideo` object go out of scope, which will have the same effect.
 
 
 StreamingVideo
