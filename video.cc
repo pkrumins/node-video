@@ -509,6 +509,16 @@ public:
 
     void Push(unsigned char *rect, int x, int y, int w, int h) {
         if (!lastFrame) VException("The first full frame was not pushed.");
+
+        int start = y*width*4 + x*4;
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < 4*w; j+=4) {
+                lastFrame[start + i*width*4 + j] = rect[i*w*4 + j];
+                lastFrame[start + i*width*4 + j + 1] = rect[i*w*4 + j + 1];
+                lastFrame[start + i*width*4 + j + 2] = rect[i*w*4 + j + 2];
+                lastFrame[start + i*width*4 + j + 3] = rect[i*w*4 + j + 3];
+            }
+        }
     }
 
     void EndPush() {
