@@ -69,16 +69,12 @@ rgb_to_yuv(const unsigned char *rgb, size_t size)
     return yuv;
 }
 
-// FixedVideo class, all frames are of fixed size (no stacking).
-class FixedVideo : public ObjectWrap {
+class VideoEncoder {
 private:
     int width, height, quality, frameRate;
     std::string outputFileName;
 
-    bool hadFrame;
     FILE *ogg_fp;
-
-    // TODO: factor it out to VideoEncoder class
     th_info ti;
     th_enc_ctx *td;
     th_comment tc;
@@ -86,31 +82,16 @@ private:
     ogg_page og;
     ogg_stream_state *ogg_os;
 
+    bool hadFrame;
+
 public:
-    FixedVideo(int wwidth, int hheight) :
+    VideoEncoder(int wwidth, int hheight) :
         width(wwidth), height(hheight), quality(31), frameRate(25),
         hadFrame(false), ogg_fp(NULL), td(NULL), ogg_os(NULL) {}
 
-    ~FixedVideo() {
-        End();
-    }
+    ~VideoEncoder() { end(); }
 
-    static void
-    Initialize(Handle<Object> target)
-    {
-        HandleScope scope;
-
-        Local<FunctionTemplate> t = FunctionTemplate::New(New);
-        t->InstanceTemplate()->SetInternalFieldCount(1);
-        NODE_SET_PROTOTYPE_METHOD(t, "newFrame", NewFrame);
-        NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
-        NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
-        NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
-        NODE_SET_PROTOTYPE_METHOD(t, "end", End);
-        target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
-    }
-
-    void NewFrame(const unsigned char *data) {
+    void newFrame(const unsigned char *data) {
         if (!hadFrame) {
             if (outputFileName.empty())
                 VException("No output means was set. Use setOutputFile to set it.");
@@ -130,19 +111,19 @@ public:
         hadFrame = true;
     }
 
-    void SetOutputFile(const char *fileName) {
+    void setOutputFile(const char *fileName) {
         outputFileName = fileName;
     }
 
-    void SetQuality(int qquality) {
+    void setQuality(int qquality) {
         quality = qquality;
     }
 
-    void SetFrameRate(int fframeRate) {
+    void setFrameRate(int fframeRate) {
         frameRate = fframeRate;
     }
 
-    void End() {
+    void end() {
         if (ogg_fp) fclose(ogg_fp);
         if (td) th_encode_free(td);
         if (ogg_os) ogg_stream_clear(ogg_os);
@@ -324,6 +305,50 @@ private:
         free(yuv_v);
         free(yuv);
     }
+};
+
+// FixedVideo class, all frames are of fixed size (no stacking).
+class FixedVideo : public ObjectWrap {
+private:
+    VideoEncoder videoEncoder;
+
+public:
+    FixedVideo(int width, int height) : videoEncoder(width, height) {}
+
+    static void
+    Initialize(Handle<Object> target)
+    {
+        HandleScope scope;
+
+        Local<FunctionTemplate> t = FunctionTemplate::New(New);
+        t->InstanceTemplate()->SetInternalFieldCount(1);
+        NODE_SET_PROTOTYPE_METHOD(t, "newFrame", NewFrame);
+        NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
+        NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
+        NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
+        NODE_SET_PROTOTYPE_METHOD(t, "end", End);
+        target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
+    }
+
+    void NewFrame(const unsigned char *data) {
+        videoEncoder.newFrame(data);
+    }
+
+    void SetOutputFile(const char *fileName) {
+        videoEncoder.setOutputFile(fileName);
+    }
+
+    void SetQuality(int quality) {
+        videoEncoder.setQuality(quality);
+    }
+
+    void SetFrameRate(int frameRate) {
+        videoEncoder.setFrameRate(frameRate);
+    }
+
+    void End() {
+        videoEncoder.end();
+    }
 
 protected:
     static Handle<Value>
@@ -446,5 +471,6 @@ init(Handle<Object> target)
 
     srand((getpid()<<16) ^ (getpid()<<8) ^ time(NULL));
     FixedVideo::Initialize(target);
+    //StackedVideo::Initialize(target);
 }
 
