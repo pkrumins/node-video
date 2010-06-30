@@ -581,8 +581,45 @@ protected:
     Push(const Arguments &args) {
         HandleScope scope;
 
-        //StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        //sv->Push((unsigned char *)rgba->data());
+        if (args.Length() != 5)
+            VException("Five arguments required - buffer, x, y, width, height.");
+
+        if (!Buffer::HasInstance(args[0]))
+            VException("First argument must be Buffer.");
+        if (!args[1]->IsInt32())
+            VException("Second argument must be integer x.");
+        if (!args[2]->IsInt32())
+            VException("Third argument must be integer y.");
+        if (!args[3]->IsInt32())
+            VException("Fourth argument must be integer width.");
+        if (!args[4]->IsInt32())
+            VException("Fifth argument must be integer height.");
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+        int x = args[1]->Int32Value();
+        int y = args[2]->Int32Value();
+        int w = args[3]->Int32Value();
+        int h = args[4]->Int32Value();
+
+        if (x < 0)
+            VException("Coordinate x smaller than 0.");
+        if (y < 0)
+            VException("Coordinate y smaller than 0.");
+        if (w < 0)
+            VException("Width smaller than 0.");
+        if (h < 0)
+            VException("Height smaller than 0.");
+        if (x >= sv->width) 
+            VException("Coordinate x exceeds StackedVideo's dimensions.");
+        if (y >= sv->height) 
+            VException("Coordinate y exceeds StackedVideo's dimensions.");
+        if (x+w > sv->width) 
+            VException("Pushed buffer exceeds StackedVideo's width.");
+        if (y+h > sv->height) 
+            VException("Pushed buffer exceeds StackedVideo's height.");
+
+        sv->Push((unsigned char *)rgba->data(), x, y, w, h);
         return Undefined();
     }
 
@@ -591,7 +628,7 @@ protected:
         HandleScope scope;
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        sv->EndPush((unsigned char *)rgba->data());
+        sv->EndPush();
         return Undefined();
     }
 
