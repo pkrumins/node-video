@@ -464,6 +464,98 @@ protected:
     }
 };
 
+class StackedVideo : public FixedVideo {
+private:
+    unsigned char *lastFrame;
+
+public:
+    StackedVideo(int width, int height) : FixedVideo(width, height),
+        lastFrame(NULL) {}
+
+    ~StackedVideo() {
+        free(lastFrame);
+    }
+
+    static void
+    Initialize(Handle<Object> target)
+    {
+        HandleScope scope;
+
+        Local<FunctionTemplate> t = FunctionTemplate::New(New);
+        t->InstanceTemplate()->SetInternalFieldCount(1);
+        NODE_SET_PROTOTYPE_METHOD(t, "newFrame", NewFrame);
+        NODE_SET_PROTOTYPE_METHOD(t, "push", Push);
+        NODE_SET_PROTOTYPE_METHOD(t, "endPush", EndPush);
+        NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
+        NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
+        NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
+        NODE_SET_PROTOTYPE_METHOD(t, "end", End);
+        target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
+    }
+
+
+    void Push(unsigned char *rect, int x, int y, int w, int h) {
+
+    }
+
+    void EndPush() {
+
+    }
+
+protected:
+    static Handle<Value>
+    New(const Arguments &args) {
+        HandleScope scope;
+        return FixedVideo::New(args);
+    }
+
+    static Handle<Value>
+    NewFrame(const Arguments &args) {
+        HandleScope scope;
+        return FixedVideo::NewFrame(args);
+    }
+
+    static Handle<Value>
+    Push(const Arguments &args) {
+        HandleScope scope;
+
+        //StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        //sv->NewFrame((unsigned char *)rgba->data());
+        return Undefined();
+    }
+
+    static Handle<Value>
+    EndPush(const Arguments &args) {
+        HandleScope scope;
+
+        //StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        //sv->NewFrame((unsigned char *)rgba->data());
+        return Undefined();
+    }
+
+    static Handle<Value>
+    End(const Arguments &args)
+    {
+        HandleScope scope;
+        return FixedVideo::End(args);
+    }
+
+    static Handle<Value>
+    SetOutputFile(const Arguments &args)
+    {
+        HandleScope scope;
+        return FixedVideo::SetOutputFile(args);
+    }
+
+    static Handle<Value>
+    SetQuality(const Arguments &args)
+    {
+        HandleScope scope;
+        return FixedVideo::SetQuality(args);
+    }
+
+};
+
 extern "C" void
 init(Handle<Object> target)
 {
