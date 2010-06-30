@@ -718,6 +718,6 @@ init(Handle<Object> target)
 
     srand((getpid()<<16) ^ (getpid()<<8) ^ time(NULL));
     FixedVideo::Initialize(target);
-    //StackedVideo::Initialize(target);
+    StackedVideo::Initialize(target);
 }
 
