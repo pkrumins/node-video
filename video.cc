@@ -590,8 +590,8 @@ protected:
     EndPush(const Arguments &args) {
         HandleScope scope;
 
-        //StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        //sv->NewFrame((unsigned char *)rgba->data());
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->EndPush((unsigned char *)rgba->data());
         return Undefined();
     }
 
