@@ -494,7 +494,7 @@ public:
         NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
         NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
         NODE_SET_PROTOTYPE_METHOD(t, "end", End);
-        target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
+        target->Set(String::NewSymbol("StackedVideo"), t->GetFunction());
     }
 
     void NewFrame(const unsigned char *data) {
