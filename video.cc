@@ -396,17 +396,6 @@ protected:
     }
 
     static Handle<Value>
-    End(const Arguments &args)
-    {
-        HandleScope scope;
-
-        FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
-        fv->End();
-
-        return Undefined();
-    }
-
-    static Handle<Value>
     SetOutputFile(const Arguments &args)
     {
         HandleScope scope;
@@ -462,19 +451,34 @@ protected:
 
         return Undefined();
     }
+
+    static Handle<Value>
+    End(const Arguments &args)
+    {
+        HandleScope scope;
+
+        FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
+        fv->End();
+
+        return Undefined();
+    }
 };
 
-class StackedVideo : public FixedVideo {
+// I have no idea how to inherit correctly with all this object wrapping,
+// so I just copy/pasted everything from FixedVideo for great good.
+class StackedVideo : public ObjectWrap {
 private:
+    int width, height;
+
+    VideoEncoder videoEncoder;
     unsigned char *lastFrame;
 
 public:
-    StackedVideo(int width, int height) : FixedVideo(width, height),
+    StackedVideo(int wwidth, int hheight) :
+        width(wwidth), height(hheight), videoEncoder(wwidth, hheight),
         lastFrame(NULL) {}
 
-    ~StackedVideo() {
-        free(lastFrame);
-    }
+    ~StackedVideo() { free(lastFrame); }
 
     static void
     Initialize(Handle<Object> target)
@@ -493,26 +497,84 @@ public:
         target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
     }
 
+    void NewFrame(const unsigned char *data) {
+        if (!lastFrame) {
+            lastFrame = (unsigned char *)malloc(width*height*4);
+            if (!lastFrame) VException("malloc failed in StackedVideo::NewFrame.");
+        }
+        memcpy(lastFrame, data, width*height*4);
+
+        videoEncoder.newFrame(data);
+    }
 
     void Push(unsigned char *rect, int x, int y, int w, int h) {
-
+        if (!lastFrame) VException("The first full frame was not pushed.");
     }
 
     void EndPush() {
+        if (!lastFrame) VException("The first full frame was not pushed.");
+        videoEncoder.newFrame(lastFrame);
+    }
 
+    void SetOutputFile(const char *fileName) {
+        videoEncoder.setOutputFile(fileName);
+    }
+
+    void SetQuality(int quality) {
+        videoEncoder.setQuality(quality);
+    }
+
+    void SetFrameRate(int frameRate) {
+        videoEncoder.setFrameRate(frameRate);
+    }
+
+    void End() {
+        videoEncoder.end();
     }
 
 protected:
     static Handle<Value>
-    New(const Arguments &args) {
+    New(const Arguments &args)
+    {
         HandleScope scope;
-        return FixedVideo::New(args);
+
+        if (args.Length() != 2)
+            VException("Two arguments required - width and height.");
+        if (!args[0]->IsInt32())
+            VException("First argument must be integer width.");
+        if (!args[1]->IsInt32())
+            VException("Second argument must be integer height.");
+
+        int w = args[0]->Int32Value();
+        int h = args[1]->Int32Value();
+
+        if (w < 0)
+            VException("Width smaller than 0.");
+        if (h < 0)
+            VException("Height smaller than 0.");
+
+        StackedVideo *sv = new StackedVideo(w, h);
+        sv->Wrap(args.This());
+        return args.This();
     }
 
     static Handle<Value>
-    NewFrame(const Arguments &args) {
+    NewFrame(const Arguments &args)
+    {
         HandleScope scope;
-        return FixedVideo::NewFrame(args);
+
+        if (args.Length() != 1)
+            VException("One argument required - Buffer with full frame data.");
+
+        if (!Buffer::HasInstance(args[0])) 
+            ThrowException(Exception::Error(String::New("First argument must be Buffer.")));
+
+        Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->NewFrame((unsigned char *)rgba->data());
+
+        return Undefined();
     }
 
     static Handle<Value>
@@ -520,7 +582,7 @@ protected:
         HandleScope scope;
 
         //StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        //sv->NewFrame((unsigned char *)rgba->data());
+        //sv->Push((unsigned char *)rgba->data());
         return Undefined();
     }
 
@@ -534,26 +596,72 @@ protected:
     }
 
     static Handle<Value>
-    End(const Arguments &args)
-    {
-        HandleScope scope;
-        return FixedVideo::End(args);
-    }
-
-    static Handle<Value>
     SetOutputFile(const Arguments &args)
     {
         HandleScope scope;
-        return FixedVideo::SetOutputFile(args);
+
+        if (args.Length() != 1)
+            VException("One argument required - output file name.");
+
+        String::AsciiValue fileName(args[0]->ToString());
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->SetOutputFile(*fileName);
+
+        return Undefined();
     }
 
     static Handle<Value>
     SetQuality(const Arguments &args)
     {
         HandleScope scope;
-        return FixedVideo::SetQuality(args);
+
+        if (args.Length() != 1) 
+            VException("One argument required - video quality.");
+
+        if (!args[0]->IsInt32())
+            VException("Quality must be integer.");
+
+        int q = args[0]->Int32Value();
+
+        if (q < 0) VException("Quality smaller than 0.");
+        if (q > 63) VException("Quality greater than 63.");
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->SetQuality(q);
+
+        return Undefined();
     }
 
+    static Handle<Value>
+    SetFrameRate(const Arguments &args)
+    {
+        HandleScope scope;
+
+        if (args.Length() != 1) 
+            VException("Two argument required - frame rate.");
+
+        if (!args[0]->IsInt32())
+            VException("Frame rate must be integer.");
+
+        int rate = args[0]->Int32Value();
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->SetFrameRate(rate);
+
+        return Undefined();
+    }
+
+    static Handle<Value>
+    End(const Arguments &args)
+    {
+        HandleScope scope;
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->End();
+
+        return Undefined();
+    }
 };
 
 extern "C" void
