@@ -188,7 +188,6 @@ private:
             fwrite(og.header, 1, og.header_len, ogg_fp);
             fwrite(og.body, 1, og.body_len, ogg_fp);
         }
-
     }
 
     void WriteFrame(const unsigned char *rgba) {
@@ -508,7 +507,16 @@ public:
     }
 
     void Push(unsigned char *rect, int x, int y, int w, int h) {
-        if (!lastFrame) VException("The first full frame was not pushed.");
+        if (!lastFrame) {
+           if (x==0 && y==0 && w==width && h==height) {
+               lastFrame = (unsigned char *)malloc(width*height*4);
+               if (!lastFrame) VException("malloc failed in StackedVideo::Push.");
+               memcpy(lastFrame, rect, width*height*4);
+               videoEncoder.newFrame(rect);
+               return;
+            }
+            VException("The first full frame was not pushed.");
+        }
 
         int start = y*width*4 + x*4;
         for (int i = 0; i < h; i++) {
