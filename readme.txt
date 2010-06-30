@@ -9,9 +9,9 @@ His blog is at http://www.catonmat.net  --  good coders code, great reuse.
 This module exports several objects that you can work with:
 
     * FixedVideo - to create videos from fixed size frames
+    * StackedVideo - to create videos from fragmented frames (stack them together)
 
     // these are not there yet, still hacking them in right now.
-    // * StackedVideo - to create videos from fragmented frames
     // * StreamingVideo - to create streamable videos (works with HTML5 <video>)
 
 
