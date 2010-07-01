@@ -124,6 +124,18 @@ StreamingVideo
 Also coming near you soon. This is the most awesome stuff!
 
 
+How to compile?
+---------------
+
+You need node.js installed to compile this module. When installed it comes with
+node-waf tool, run it in this libs dir:
+
+    node-waf configure build
+
+This will produce video.node dll. After that, make sure NODE_PATH contains lib's
+dir. 
+
+
 Other stuff in this module
 --------------------------
 
