@@ -3,9 +3,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
-#include <vector>
 #include <string>
-#include <utility>
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
@@ -16,8 +14,10 @@ using namespace node;
 
 static int chroma_format = TH_PF_420;
 
-static void VException(const char *msg) {
-    ThrowException(Exception::Error(String::New(msg)));
+static Handle<Value>
+VException(const char *msg) {
+    HandleScope scope;
+    return ThrowException(Exception::Error(String::New(msg)));
 }
 
 static inline unsigned char
@@ -34,7 +34,7 @@ rgba_to_yuv(const unsigned char *rgba, size_t size)
 {
     unsigned char r, g, b;
     unsigned char *yuv = (unsigned char *)malloc(size*3/4);
-    if (!yuv) VException("malloc failed in rgba_to_yuv");
+    if (!yuv) return NULL;
 
     for (size_t i=0, j=0; i<size; i+=4, j+=3) {
         r = rgba[i];
@@ -54,7 +54,7 @@ rgb_to_yuv(const unsigned char *rgb, size_t size)
 {
     unsigned char r, g, b;
     unsigned char *yuv = (unsigned char *)malloc(size);
-    if (!yuv) VException("malloc failed in rgb_to_yuv");
+    if (!yuv) return NULL;
 
     for (size_t i=0; i<size; i+=3) {
         r = rgb[i];
@@ -91,24 +91,35 @@ public:
 
     ~VideoEncoder() { end(); }
 
-    void newFrame(const unsigned char *data) {
+    Handle<Value>
+    newFrame(const unsigned char *data)
+    {
+        HandleScope scope;
+        Handle<Value> ret;
+
         if (!hadFrame) {
             if (outputFileName.empty())
-                VException("No output means was set. Use setOutputFile to set it.");
+                return VException("No output means was set. Use setOutputFile to set it.");
 
             ogg_fp = fopen(outputFileName.c_str(), "w+");
             if (!ogg_fp) {
                 char error_msg[256];
                 snprintf(error_msg, 256, "Could not open %s. Error: %s.",
                     outputFileName.c_str(), strerror(errno));
-                VException(error_msg);
+                return VException(error_msg);
             }
 
-            InitTheora();
-            WriteHeaders();
+            ret = InitTheora();
+            if (ret != Undefined()) return ret;
+
+            ret = WriteHeaders();
+            if (ret != Undefined()) return ret;
         }
-        WriteFrame(data);
+        ret = WriteFrame(data);
+        if (ret != Undefined()) return ret;
         hadFrame = true;
+
+        return Undefined();
     }
 
     void setOutputFile(const char *fileName) {
@@ -139,7 +150,11 @@ public:
     }
 
 private:
-    void InitTheora() {
+    Handle<Value>
+    InitTheora()
+    {
+        HandleScope scope;
+
         th_info_init(&ti);
         ti.frame_width = ((width + 15) >> 4) << 4; // make sure width%16==0
         ti.frame_height = ((height + 15) >> 4) << 4;
@@ -162,21 +177,27 @@ private:
 
         ogg_os = (ogg_stream_state *)malloc(sizeof(ogg_stream_state));
         if (!ogg_os)
-            VException("malloc failed in InitTheora for ogg_stream_state");
+            return VException("malloc failed in InitTheora for ogg_stream_state");
 
         if (ogg_stream_init(ogg_os, rand()))
-            VException("ogg_stream_init failed in InitTheora");
+            return VException("ogg_stream_init failed in InitTheora");
+
+        return Undefined();
     }
 
-    void WriteHeaders() {
+    Handle<Value>
+    WriteHeaders()
+    {
+        HandleScope scope;
+
         th_comment_init(&tc);
         if (th_encode_flushheader(td, &tc, &op) <= 0)
-            VException("th_encode_flushheader failed in WriteHeaders");
+            return VException("th_encode_flushheader failed in WriteHeaders");
         th_comment_clear(&tc);
 
         ogg_stream_packetin(ogg_os, &op);
         if (ogg_stream_pageout(ogg_os, &og)!=1)
-            VException("ogg_stream_pageout failed in WriteHeaders");
+            return VException("ogg_stream_pageout failed in WriteHeaders");
 
         fwrite(og.header,1,og.header_len,ogg_fp);
         fwrite(og.body,1,og.body_len,ogg_fp);
@@ -184,7 +205,7 @@ private:
         for (;;) {
             int ret = th_encode_flushheader(td, &tc, &op);
             if (ret<0)
-                VException("th_encode_flushheader failed in WriteHeaders");
+                return VException("th_encode_flushheader failed in WriteHeaders");
             else if (ret == 0) break;
             ogg_stream_packetin(ogg_os, &op);
         }
@@ -192,14 +213,20 @@ private:
         for (;;) {
             int ret = ogg_stream_flush(ogg_os, &og);
             if (ret < 0)
-                VException("ogg_stream_flush failed in WriteHeaders");
+                return VException("ogg_stream_flush failed in WriteHeaders");
             else if (ret == 0) break;
             fwrite(og.header, 1, og.header_len, ogg_fp);
             fwrite(og.body, 1, og.body_len, ogg_fp);
         }
+
+        return Undefined();
     }
 
-    void WriteFrame(const unsigned char *rgba) {
+    Handle<Value>
+    WriteFrame(const unsigned char *rgba)
+    {
+        HandleScope scope;
+
         th_ycbcr_buffer ycbcr;
         ogg_packet op;
         ogg_page og;
@@ -216,6 +243,8 @@ private:
         unsigned int y;
 
         yuv = rgba_to_yuv(rgba, width*height*4);
+        if (!yuv)
+            return VException("malloc failed in rgba_to_yuv");
 
         yuv_w = (width + 15) & ~15;
         yuv_h = (height + 15) & ~15;
@@ -233,20 +262,20 @@ private:
         yuv_y = (unsigned char*)malloc(ycbcr[0].stride * ycbcr[0].height);
         if (!yuv_y) {
             free(yuv);
-            VException("malloc failed in WriteFrame for yuv_y");
+            return VException("malloc failed in WriteFrame for yuv_y");
         }
         yuv_u = (unsigned char*)malloc(ycbcr[1].stride * ycbcr[1].height);
         if (!yuv_u) {
             free(yuv);
             free(yuv_y);
-            VException("malloc failed in WriteFrame for yuv_u");
+            return VException("malloc failed in WriteFrame for yuv_u");
         }
         yuv_v = (unsigned char*)malloc(ycbcr[2].stride * ycbcr[2].height);
         if (!yuv_u) {
             free(yuv);
             free(yuv_y);
             free(yuv_u);
-            VException("malloc failed in WriteFrame for yuv_v");
+            return VException("malloc failed in WriteFrame for yuv_v");
         }
 
         ycbcr[0].data = yuv_y;
@@ -291,7 +320,7 @@ private:
             free(yuv_y);
             free(yuv_u);
             free(yuv_v);
-            VException("th_encode_ycbcr_in failed in WriteFrame");
+            return VException("th_encode_ycbcr_in failed in WriteFrame");
         }
 
         if(!th_encode_packetout(td, 0, &op)) {
@@ -299,7 +328,7 @@ private:
             free(yuv_y);
             free(yuv_u);
             free(yuv_v);
-            VException("th_encode_packetout failed in WriteFrame");
+            return VException("th_encode_packetout failed in WriteFrame");
         }
 
         ogg_stream_packetin(ogg_os, &op);
@@ -312,6 +341,8 @@ private:
         free(yuv_u);
         free(yuv_v);
         free(yuv);
+
+        return Undefined();
     }
 };
 
@@ -365,19 +396,19 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 2)
-            VException("Two arguments required - width and height.");
+            return VException("Two arguments required - width and height.");
         if (!args[0]->IsInt32())
-            VException("First argument must be integer width.");
+            return VException("First argument must be integer width.");
         if (!args[1]->IsInt32())
-            VException("Second argument must be integer height.");
+            return VException("Second argument must be integer height.");
 
         int w = args[0]->Int32Value();
         int h = args[1]->Int32Value();
 
         if (w < 0)
-            VException("Width smaller than 0.");
+            return VException("Width smaller than 0.");
         if (h < 0)
-            VException("Height smaller than 0.");
+            return VException("Height smaller than 0.");
 
         FixedVideo *fv = new FixedVideo(w, h);
         fv->Wrap(args.This());
@@ -390,10 +421,10 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1)
-            VException("One argument required - Buffer with full frame data.");
+            return VException("One argument required - Buffer with full frame data.");
 
         if (!Buffer::HasInstance(args[0])) 
-            ThrowException(Exception::Error(String::New("First argument must be Buffer.")));
+            return VException("First argument must be Buffer.");
 
         Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
 
@@ -409,7 +440,7 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1)
-            VException("One argument required - output file name.");
+            return VException("One argument required - output file name.");
 
         String::AsciiValue fileName(args[0]->ToString());
 
@@ -425,15 +456,15 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1) 
-            VException("One argument required - video quality.");
+            return VException("One argument required - video quality.");
 
         if (!args[0]->IsInt32())
-            VException("Quality must be integer.");
+            return VException("Quality must be integer.");
 
         int q = args[0]->Int32Value();
 
-        if (q < 0) VException("Quality smaller than 0.");
-        if (q > 63) VException("Quality greater than 63.");
+        if (q < 0) return VException("Quality smaller than 0.");
+        if (q > 63) return VException("Quality greater than 63.");
 
         FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
         fv->SetQuality(q);
@@ -447,10 +478,10 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1) 
-            VException("Two argument required - frame rate.");
+            return VException("One argument required - frame rate.");
 
         if (!args[0]->IsInt32())
-            VException("Frame rate must be integer.");
+            return VException("Frame rate must be integer.");
 
         int rate = args[0]->Int32Value();
 
@@ -505,26 +536,36 @@ public:
         target->Set(String::NewSymbol("StackedVideo"), t->GetFunction());
     }
 
-    void NewFrame(const unsigned char *data) {
+    Handle<Value>
+    NewFrame(const unsigned char *data)
+    {
+        HandleScope scope;
+
         if (!lastFrame) {
             lastFrame = (unsigned char *)malloc(width*height*4);
-            if (!lastFrame) VException("malloc failed in StackedVideo::NewFrame.");
+            if (!lastFrame)
+                return VException("malloc failed in StackedVideo::NewFrame.");
         }
         memcpy(lastFrame, data, width*height*4);
 
         videoEncoder.newFrame(data);
     }
 
-    void Push(unsigned char *rect, int x, int y, int w, int h) {
+    Handle<Value>
+    Push(unsigned char *rect, int x, int y, int w, int h)
+    {
+        HandleScope scope;
+
         if (!lastFrame) {
            if (x==0 && y==0 && w==width && h==height) {
                lastFrame = (unsigned char *)malloc(width*height*4);
-               if (!lastFrame) VException("malloc failed in StackedVideo::Push.");
+               if (!lastFrame) 
+                   return VException("malloc failed in StackedVideo::Push.");
                memcpy(lastFrame, rect, width*height*4);
                videoEncoder.newFrame(rect);
-               return;
+               return Undefined();
             }
-            VException("The first full frame was not pushed.");
+            return VException("The first full frame was not pushed.");
         }
 
         int start = y*width*4 + x*4;
@@ -536,11 +577,20 @@ public:
                 lastFrame[start + i*width*4 + j + 3] = rect[i*w*4 + j + 3];
             }
         }
+
+        return Undefined();
     }
 
-    void EndPush() {
-        if (!lastFrame) VException("The first full frame was not pushed.");
+    Handle<Value>
+    EndPush()
+    {
+        HandleScope scope;
+
+        if (!lastFrame)
+            return VException("The first full frame was not pushed.");
         videoEncoder.newFrame(lastFrame);
+
+        return Undefined();
     }
 
     void SetOutputFile(const char *fileName) {
@@ -566,19 +616,19 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 2)
-            VException("Two arguments required - width and height.");
+            return VException("Two arguments required - width and height.");
         if (!args[0]->IsInt32())
-            VException("First argument must be integer width.");
+            return VException("First argument must be integer width.");
         if (!args[1]->IsInt32())
-            VException("Second argument must be integer height.");
+            return VException("Second argument must be integer height.");
 
         int w = args[0]->Int32Value();
         int h = args[1]->Int32Value();
 
         if (w < 0)
-            VException("Width smaller than 0.");
+            return VException("Width smaller than 0.");
         if (h < 0)
-            VException("Height smaller than 0.");
+            return VException("Height smaller than 0.");
 
         StackedVideo *sv = new StackedVideo(w, h);
         sv->Wrap(args.This());
@@ -591,10 +641,10 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1)
-            VException("One argument required - Buffer with full frame data.");
+            return VException("One argument required - Buffer with full frame data.");
 
         if (!Buffer::HasInstance(args[0])) 
-            ThrowException(Exception::Error(String::New("First argument must be Buffer.")));
+            return VException("First argument must be Buffer.");
 
         Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
 
@@ -605,22 +655,23 @@ protected:
     }
 
     static Handle<Value>
-    Push(const Arguments &args) {
+    Push(const Arguments &args)
+    {
         HandleScope scope;
 
         if (args.Length() != 5)
-            VException("Five arguments required - buffer, x, y, width, height.");
+            return VException("Five arguments required - buffer, x, y, width, height.");
 
         if (!Buffer::HasInstance(args[0]))
-            VException("First argument must be Buffer.");
+            return VException("First argument must be Buffer.");
         if (!args[1]->IsInt32())
-            VException("Second argument must be integer x.");
+            return VException("Second argument must be integer x.");
         if (!args[2]->IsInt32())
-            VException("Third argument must be integer y.");
+            return VException("Third argument must be integer y.");
         if (!args[3]->IsInt32())
-            VException("Fourth argument must be integer width.");
+            return VException("Fourth argument must be integer width.");
         if (!args[4]->IsInt32())
-            VException("Fifth argument must be integer height.");
+            return VException("Fifth argument must be integer height.");
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
         Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
@@ -630,23 +681,24 @@ protected:
         int h = args[4]->Int32Value();
 
         if (x < 0)
-            VException("Coordinate x smaller than 0.");
+            return VException("Coordinate x smaller than 0.");
         if (y < 0)
-            VException("Coordinate y smaller than 0.");
+            return VException("Coordinate y smaller than 0.");
         if (w < 0)
-            VException("Width smaller than 0.");
+            return VException("Width smaller than 0.");
         if (h < 0)
-            VException("Height smaller than 0.");
+            return VException("Height smaller than 0.");
         if (x >= sv->width) 
-            VException("Coordinate x exceeds StackedVideo's dimensions.");
+            return VException("Coordinate x exceeds StackedVideo's dimensions.");
         if (y >= sv->height) 
-            VException("Coordinate y exceeds StackedVideo's dimensions.");
+            return VException("Coordinate y exceeds StackedVideo's dimensions.");
         if (x+w > sv->width) 
-            VException("Pushed buffer exceeds StackedVideo's width.");
+            return VException("Pushed buffer exceeds StackedVideo's width.");
         if (y+h > sv->height) 
-            VException("Pushed buffer exceeds StackedVideo's height.");
+            return VException("Pushed buffer exceeds StackedVideo's height.");
 
         sv->Push((unsigned char *)rgba->data(), x, y, w, h);
+
         return Undefined();
     }
 
@@ -656,6 +708,7 @@ protected:
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
         sv->EndPush();
+
         return Undefined();
     }
 
@@ -665,7 +718,7 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1)
-            VException("One argument required - output file name.");
+            return VException("One argument required - output file name.");
 
         String::AsciiValue fileName(args[0]->ToString());
 
@@ -681,15 +734,15 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1) 
-            VException("One argument required - video quality.");
+            return VException("One argument required - video quality.");
 
         if (!args[0]->IsInt32())
-            VException("Quality must be integer.");
+            return VException("Quality must be integer.");
 
         int q = args[0]->Int32Value();
 
-        if (q < 0) VException("Quality smaller than 0.");
-        if (q > 63) VException("Quality greater than 63.");
+        if (q < 0) return VException("Quality smaller than 0.");
+        if (q > 63) return VException("Quality greater than 63.");
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
         sv->SetQuality(q);
@@ -703,10 +756,10 @@ protected:
         HandleScope scope;
 
         if (args.Length() != 1) 
-            VException("Two argument required - frame rate.");
+            return VException("Two argument required - frame rate.");
 
         if (!args[0]->IsInt32())
-            VException("Frame rate must be integer.");
+            return VException("Frame rate must be integer.");
 
         int rate = args[0]->Int32Value();
 
