@@ -124,9 +124,18 @@ public:
     }
 
     void end() {
-        if (ogg_fp) fclose(ogg_fp);
-        if (td) th_encode_free(td);
-        if (ogg_os) ogg_stream_clear(ogg_os);
+        if (ogg_fp) {
+            fclose(ogg_fp);
+            ogg_fp = NULL;
+        }
+        if (td) {
+            th_encode_free(td);
+            td = NULL;
+        }
+        if (ogg_os) {
+            ogg_stream_clear(ogg_os);
+            ogg_os = NULL;
+        }
     }
 
 private:
