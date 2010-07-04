@@ -102,7 +102,9 @@ to push an update to the frame. The usage is as following:
     stackedVideo.push(rgba_rectangle, x, y, width, height);
 
 This will put the rectangle of width x height at position (x, y). Make sure
-dimensions don't overflow or you'll get an exception.
+dimensions don't overflow or you'll get an exception. You can also push the
+first full frame with this method instead of using newFrame, make sure that
+(x,y) = (0,0) and width, height are video's width, height.
 
 After you're done pushing all the updates you wanted, call `endPush`. This
 will encode the frame (and keep the previous frame in memory, so you can `push`
@@ -148,7 +150,7 @@ understanding, and then rewrite it to produce working modules.
 I also tried libx264 but since it was only supported by Chrome, I went with
 libtheora. Maybe I'll add libx264 later as it gets support from more browsers.
 
-This library was written for my and substack's StackVM startup.
+This library was written for my and SubStack's StackVM startup.
 
 ------------------------------------------------------------------------------
 
