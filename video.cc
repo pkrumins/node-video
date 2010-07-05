@@ -110,13 +110,13 @@ public:
             }
 
             ret = InitTheora();
-            if (ret != Undefined()) return ret;
+            if (ret->IsUndefined()) return ret;
 
             ret = WriteHeaders();
-            if (ret != Undefined()) return ret;
+            if (ret->IsUndefined()) return ret;
         }
         ret = WriteFrame(data);
-        if (ret != Undefined()) return ret;
+        if (ret->IsUndefined()) return ret;
         hadFrame = true;
 
         return Undefined();
