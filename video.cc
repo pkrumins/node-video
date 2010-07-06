@@ -337,6 +337,10 @@ private:
             fwrite(og.body, og.body_len, 1, ogg_fp);
         }
 
+        ogg_stream_flush(ogg_os, &og);
+        fwrite(og.header, og.header_len, 1, ogg_fp);
+        fwrite(og.body, og.body_len, 1, ogg_fp);
+
         free(yuv_y);
         free(yuv_u);
         free(yuv_v);
