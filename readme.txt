@@ -46,6 +46,11 @@ to change it do this:
 
     video.setFrameRate(50);  // frame rate is now 50 fps
 
+The keyframe interval can also be controlled. Use `setKeyFrameInterval` to set it.
+It must be a power of two:
+
+    video.setKeyFrameInterval(128);  // keyframe every 128 frames
+
 Important: All of the above options should be set before submitting the first
 frame.
 
@@ -88,8 +93,8 @@ Then set the output file:
 
     stackedVideo.setOutputFile('./screencast.ogv');
 
-Then set the quality and/or framerate via `setQuality` and `setFrameRate`
-methods.
+Then set the quality, framerate, keyframe interval, via `setQuality`,
+`setFrameRate`, `setKeyFrameInterval` methods.
 
 Now you have to submit a full frame to StackedVideo, do it via regular
 `newFrame` method:

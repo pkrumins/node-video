@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+#include <cmath>
 #include <theora/theoraenc.h>
 
 using namespace v8;
@@ -71,7 +72,7 @@ rgb_to_yuv(const unsigned char *rgb, size_t size)
 
 class VideoEncoder {
 private:
-    int width, height, quality, frameRate;
+    int width, height, quality, frameRate, keyFrameInterval;
     std::string outputFileName;
 
     FILE *ogg_fp;
@@ -87,6 +88,7 @@ private:
 public:
     VideoEncoder(int wwidth, int hheight) :
         width(wwidth), height(hheight), quality(31), frameRate(25),
+        keyFrameInterval(64),
         hadFrame(false), ogg_fp(NULL), td(NULL), ogg_os(NULL) {}
 
     ~VideoEncoder() { end(); }
@@ -134,6 +136,10 @@ public:
         frameRate = fframeRate;
     }
 
+    void setKeyFrameInterval(int kkeyFrameInterval) {
+        keyFrameInterval = kkeyFrameInterval;
+    }
+
     void end() {
         if (ogg_fp) {
             fclose(ogg_fp);
@@ -170,7 +176,7 @@ private:
         ti.pixel_fmt = TH_PF_420;
         ti.target_bitrate = 0;
         ti.quality = quality;
-        ti.keyframe_granule_shift=6; // keyframe every 64 frames
+        ti.keyframe_granule_shift = (int)log2(keyFrameInterval);
 
         td = th_encode_alloc(&ti);
         th_info_clear(&ti);
@@ -369,6 +375,7 @@ public:
         NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
         NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
         NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
+        NODE_SET_PROTOTYPE_METHOD(t, "setKeyFrameInterval", SetKeyFrameInterval);
         NODE_SET_PROTOTYPE_METHOD(t, "end", End);
         target->Set(String::NewSymbol("FixedVideo"), t->GetFunction());
     }
@@ -387,6 +394,10 @@ public:
 
     void SetFrameRate(int frameRate) {
         videoEncoder.setFrameRate(frameRate);
+    }
+
+    void SetKeyFrameInterval(int keyFrameInterval) {
+        videoEncoder.setKeyFrameInterval(keyFrameInterval);
     }
 
     void End() {
@@ -488,9 +499,37 @@ protected:
             return VException("Frame rate must be integer.");
 
         int rate = args[0]->Int32Value();
+        
+        if (rate < 0)
+            return VException("Frame rate must be positive.");
 
         FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
         fv->SetFrameRate(rate);
+
+        return Undefined();
+    }
+
+    static Handle<Value>
+    SetKeyFrameInterval(const Arguments &args)
+    {
+        HandleScope scope;
+
+        if (args.Length() != 1) 
+            return VException("One argument required - keyframe interval.");
+
+        if (!args[0]->IsInt32())
+            return VException("Keyframe interval must be integer.");
+
+        int interval = args[0]->Int32Value();
+
+        if (interval < 0)
+            return VException("Keyframe interval must be positive.");
+
+        if ((interval & (interval - 1)) != 0)
+            return VException("Keyframe interval must be a power of two.");
+
+        FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
+        fv->SetKeyFrameInterval(interval);
 
         return Undefined();
     }
@@ -536,6 +575,7 @@ public:
         NODE_SET_PROTOTYPE_METHOD(t, "setOutputFile", SetOutputFile);
         NODE_SET_PROTOTYPE_METHOD(t, "setQuality", SetQuality);
         NODE_SET_PROTOTYPE_METHOD(t, "setFrameRate", SetFrameRate);
+        NODE_SET_PROTOTYPE_METHOD(t, "setKeyFrameInterval", SetKeyFrameInterval);
         NODE_SET_PROTOTYPE_METHOD(t, "end", End);
         target->Set(String::NewSymbol("StackedVideo"), t->GetFunction());
     }
@@ -607,6 +647,10 @@ public:
 
     void SetFrameRate(int frameRate) {
         videoEncoder.setFrameRate(frameRate);
+    }
+
+    void SetKeyFrameInterval(int keyFrameInterval) {
+        videoEncoder.setKeyFrameInterval(keyFrameInterval);
     }
 
     void End() {
@@ -769,6 +813,31 @@ protected:
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
         sv->SetFrameRate(rate);
+
+        return Undefined();
+    }
+
+    static Handle<Value>
+    SetKeyFrameInterval(const Arguments &args)
+    {
+        HandleScope scope;
+
+        if (args.Length() != 1) 
+            return VException("One argument required - keyframe interval.");
+
+        if (!args[0]->IsInt32())
+            return VException("Keyframe interval must be integer.");
+
+        int interval = args[0]->Int32Value();
+
+        if (interval < 0)
+            return VException("Keyframe interval must be positive.");
+
+        if ((interval & (interval - 1)) != 0)
+            return VException("Keyframe interval must be a power of two.");
+
+        StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+        sv->SetKeyFrameInterval(interval);
 
         return Undefined();
     }
