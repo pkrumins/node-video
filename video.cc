@@ -83,13 +83,14 @@ private:
     ogg_page og;
     ogg_stream_state *ogg_os;
 
-    bool hadFrame;
+    unsigned long frameCount;
 
 public:
     VideoEncoder(int wwidth, int hheight) :
         width(wwidth), height(hheight), quality(31), frameRate(25),
         keyFrameInterval(64),
-        hadFrame(false), ogg_fp(NULL), td(NULL), ogg_os(NULL) {}
+        ogg_fp(NULL), td(NULL), ogg_os(NULL),
+        frameCount(0) {}
 
     ~VideoEncoder() { end(); }
 
@@ -99,7 +100,7 @@ public:
         HandleScope scope;
         Handle<Value> ret;
 
-        if (!hadFrame) {
+        if (!frameCount) {
             if (outputFileName.empty())
                 return VException("No output means was set. Use setOutputFile to set it.");
 
@@ -119,7 +120,7 @@ public:
         }
         ret = WriteFrame(data);
         if (!ret->IsUndefined()) return ret;
-        hadFrame = true;
+        frameCount++;
 
         return Undefined();
     }
