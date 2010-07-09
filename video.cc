@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 #include <string>
 #include <sys/types.h>
 #include <unistd.h>
@@ -125,6 +126,14 @@ public:
         return Undefined();
     }
 
+    Handle<Value>
+    dupFrame(const unsigned char *data, int time)
+    {
+        int frames = ceil((float)time*frameRate/1000);
+        printf("Frames: %d, time: %d\n", frames, time);
+        return WriteFrame(data, frames);
+    }
+
     void setOutputFile(const char *fileName) {
         outputFileName = fileName;
     }
@@ -182,6 +191,9 @@ private:
         td = th_encode_alloc(&ti);
         th_info_clear(&ti);
 
+        //int comp=1;
+        //th_encode_ctl(td,TH_ENCCTL_SET_VP3_COMPATIBLE,&comp,sizeof(comp));
+
         ogg_os = (ogg_stream_state *)malloc(sizeof(ogg_stream_state));
         if (!ogg_os)
             return VException("malloc failed in InitTheora for ogg_stream_state");
@@ -230,7 +242,7 @@ private:
     }
 
     Handle<Value>
-    WriteFrame(const unsigned char *rgba)
+    WriteFrame(const unsigned char *rgba, int dupCount=0)
     {
         HandleScope scope;
 
@@ -322,6 +334,17 @@ private:
             }    
         }
 
+        if (dupCount > 0) {
+            int ret = th_encode_ctl(td, TH_ENCCTL_SET_DUP_COUNT, &dupCount, sizeof(int));
+            if (ret) {
+                free(yuv);
+                free(yuv_y);
+                free(yuv_u);
+                free(yuv_v);
+                return VException("th_encode_ctl failed for dupCount>0");
+            }
+        }
+
         if(th_encode_ycbcr_in(td, ycbcr)) {
             free(yuv);
             free(yuv_y);
@@ -330,18 +353,19 @@ private:
             return VException("th_encode_ycbcr_in failed in WriteFrame");
         }
 
-        if(!th_encode_packetout(td, 0, &op)) {
-            free(yuv);
-            free(yuv_y);
-            free(yuv_u);
-            free(yuv_v);
-            return VException("th_encode_packetout failed in WriteFrame");
-        }
-
-        ogg_stream_packetin(ogg_os, &op);
-        while(ogg_stream_pageout(ogg_os, &og)) {
-            fwrite(og.header, og.header_len, 1, ogg_fp);
-            fwrite(og.body, og.body_len, 1, ogg_fp);
+        while (int ret = th_encode_packetout(td, 0, &op)) {
+            if (ret < 0) {
+                free(yuv);
+                free(yuv_y);
+                free(yuv_u);
+                free(yuv_v);
+                return VException("th_encode_packetout failed in WriteFrame");
+            }
+            ogg_stream_packetin(ogg_os, &op);
+            while(ogg_stream_pageout(ogg_os, &og)) {
+                fwrite(og.header, og.header_len, 1, ogg_fp);
+                fwrite(og.body, og.body_len, 1, ogg_fp);
+            }
         }
 
         ogg_stream_flush(ogg_os, &og);
@@ -357,7 +381,7 @@ private:
     }
 };
 
-// FixedVideo class, all frames are of fixed size (no stacking).
+// FixedVideo class, all frames are of fixed size.
 class FixedVideo : public ObjectWrap {
 private:
     VideoEncoder videoEncoder;
@@ -555,11 +579,24 @@ private:
 
     VideoEncoder videoEncoder;
     unsigned char *lastFrame;
+    unsigned long lastTimeStamp;
+
+    struct Update {
+        int x, y, w, h;
+        typedef std::vector<unsigned char> Rect;
+        Rect rect;
+        Update(unsigned char *rrect, int xx, int yy, int ww, int hh) :
+            rect(rrect, rrect+(ww*hh*4)), x(xx), y(yy), w(ww), h(hh) {}
+    };
+
+    typedef std::vector<Update> VectorUpdate;
+    typedef VectorUpdate::iterator VectorUpdateIterator;
+    VectorUpdate updates;
 
 public:
     StackedVideo(int wwidth, int hheight) :
         width(wwidth), height(hheight), videoEncoder(wwidth, hheight),
-        lastFrame(NULL) {}
+        lastFrame(NULL), lastTimeStamp(0) {}
 
     ~StackedVideo() { free(lastFrame); }
 
@@ -582,7 +619,7 @@ public:
     }
 
     Handle<Value>
-    NewFrame(const unsigned char *data)
+    NewFrame(const unsigned char *data, unsigned long timeStamp=0)
     {
         HandleScope scope;
 
@@ -591,9 +628,16 @@ public:
             if (!lastFrame)
                 return VException("malloc failed in StackedVideo::NewFrame.");
         }
-        memcpy(lastFrame, data, width*height*4);
+
+        if (lastTimeStamp != 0 && timeStamp > 0)
+            videoEncoder.dupFrame(lastFrame, timeStamp-lastTimeStamp);
 
         videoEncoder.newFrame(data);
+
+        memcpy(lastFrame, data, width*height*4);
+        lastTimeStamp = timeStamp;
+
+        return Undefined();
     }
 
     Handle<Value>
@@ -607,33 +651,48 @@ public:
                if (!lastFrame) 
                    return VException("malloc failed in StackedVideo::Push.");
                memcpy(lastFrame, rect, width*height*4);
-               videoEncoder.newFrame(rect);
                return Undefined();
             }
             return VException("The first full frame was not pushed.");
         }
 
-        int start = y*width*4 + x*4;
-        for (int i = 0; i < h; i++) {
-            for (int j = 0; j < 4*w; j+=4) {
-                lastFrame[start + i*width*4 + j] = rect[i*w*4 + j];
-                lastFrame[start + i*width*4 + j + 1] = rect[i*w*4 + j + 1];
-                lastFrame[start + i*width*4 + j + 2] = rect[i*w*4 + j + 2];
-                lastFrame[start + i*width*4 + j + 3] = rect[i*w*4 + j + 3];
-            }
-        }
+        updates.push_back(Update(rect, x, y, w, h));
 
         return Undefined();
     }
 
     Handle<Value>
-    EndPush()
+    EndPush(unsigned long timeStamp=0)
     {
         HandleScope scope;
 
         if (!lastFrame)
             return VException("The first full frame was not pushed.");
+
+        if (lastTimeStamp != 0 && timeStamp > 0)
+            videoEncoder.dupFrame(lastFrame, timeStamp-lastTimeStamp);
+
+        for (VectorUpdateIterator it = updates.begin();
+            it != updates.end();
+            ++it)
+        {
+            const Update &update = *it;
+
+            int start = (update.y)*width*4 + (update.x)*4;
+            for (int i = 0; i < update.h; i++) {
+                for (int j = 0; j < 4*(update.w); j+=4) {
+                    lastFrame[start + i*width*4 + j] = update.rect[i*(update.w)*4 + j];
+                    lastFrame[start + i*width*4 + j + 1] = update.rect[i*(update.w)*4 + j + 1];
+                    lastFrame[start + i*width*4 + j + 2] = update.rect[i*(update.w)*4 + j + 2];
+                    lastFrame[start + i*width*4 + j + 3] = update.rect[i*(update.w)*4 + j + 3];
+                }
+            }
+        }
+        updates.clear();
+
         videoEncoder.newFrame(lastFrame);
+
+        lastTimeStamp = timeStamp;
 
         return Undefined();
     }
@@ -689,16 +748,29 @@ protected:
     {
         HandleScope scope;
 
-        if (args.Length() != 1)
+        if (args.Length() < 1)
             return VException("One argument required - Buffer with full frame data.");
 
         if (!Buffer::HasInstance(args[0])) 
             return VException("First argument must be Buffer.");
 
+        unsigned long timeStamp = 0;
+
+        if (args.Length() == 2) {
+            if (!args[1]->IsNumber())
+                return VException("Second argument (if present) must be int64 timestamp (measured in milliseconds).");
+
+            timeStamp = args[1]->IntegerValue();
+            if (timeStamp < 0)
+                return VException("Timestamp can't be negative.");
+
+            printf("%lu\n", timeStamp);
+        }
+
         Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        sv->NewFrame((unsigned char *)rgba->data());
+        sv->NewFrame((unsigned char *)rgba->data(), timeStamp);
 
         return Undefined();
     }
@@ -755,8 +827,22 @@ protected:
     EndPush(const Arguments &args) {
         HandleScope scope;
 
+        unsigned long timeStamp = 0;
+
+        if (args.Length() == 1) {
+            if (!args[0]->IsNumber())
+                return VException("First argument (if present) must be int64 timestamp (measured in milliseconds).");
+
+            timeStamp = args[0]->IntegerValue();
+
+            if (timeStamp < 0)
+                return VException("Timestamp can't be negative.");
+
+            printf("%lu\n", timeStamp);
+        }
+
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        sv->EndPush();
+        sv->EndPush(timeStamp);
 
         return Undefined();
     }
