@@ -774,8 +774,6 @@ protected:
             timeStamp = args[1]->IntegerValue();
             if (timeStamp < 0)
                 return VException("Timestamp can't be negative.");
-
-            printf("%lu\n", timeStamp);
         }
 
         Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
@@ -848,8 +846,6 @@ protected:
 
             if (timeStamp < 0)
                 return VException("Timestamp can't be negative.");
-
-            printf("%lu\n", timeStamp);
         }
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
