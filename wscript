@@ -12,7 +12,7 @@ def set_options(opt):
 def configure(conf):
   conf.check_tool("compiler_cxx")
   conf.check_tool("node_addon")
-  conf.check(lib='ogg', libpath=['/lib', '/usr/lib', '/usr/local/lib', '/usr/local/libogg/lib', '/usr/local/pkg/libogg/lib', '/usr/local/pkg/libogg-1.1.4/lib'])
+  conf.check(lib='ogg', libpath=['/lib', '/usr/lib', '/usr/local/lib', '/usr/local/libogg/lib', '/usr/local/pkg/libogg/lib', '/usr/local/pkg/libogg-1.2.0/lib'])
   conf.check(lib='theoradec', libpath=['/lib', '/usr/lib', '/usr/local/lib', '/usr/local/libtheora/lib', '/usr/local/pkg/libtheora/lib', '/usr/local/pkg/libtheora-1.1.1/lib'])
   conf.check(lib='theoraenc', uselib='THEORADEC', libpath=['/lib', '/usr/lib', '/usr/local/lib', '/usr/local/libtheora/lib', '/usr/local/pkg/libtheora/lib', '/usr/local/pkg/libtheora-1.1.1/lib'])
 
