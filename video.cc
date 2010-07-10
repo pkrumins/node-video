@@ -130,8 +130,19 @@ public:
     dupFrame(const unsigned char *data, int time)
     {
         int frames = ceil((float)time*frameRate/1000);
-        printf("Frames: %d, time: %d\n", frames, time);
-        return WriteFrame(data, frames);
+        int repetitions = floor((float)frames/(keyFrameInterval-1));
+        int i;
+
+        if (repetitions == 0)
+            return WriteFrame(data, frames);
+
+        for (i = 1; i<=repetitions; i++) {
+            Handle<Value> ret = WriteFrame(data, keyFrameInterval-1);
+            if (!ret->IsUndefined()) return ret;
+        }
+        
+        if (mod) return WriteFrame(data, mod);
+        return Undefined();
     }
 
     void setOutputFile(const char *fileName) {
@@ -191,8 +202,8 @@ private:
         td = th_encode_alloc(&ti);
         th_info_clear(&ti);
 
-        //int comp=1;
-        //th_encode_ctl(td,TH_ENCCTL_SET_VP3_COMPATIBLE,&comp,sizeof(comp));
+        int comp=1;
+        th_encode_ctl(td,TH_ENCCTL_SET_VP3_COMPATIBLE,&comp,sizeof(comp));
 
         ogg_os = (ogg_stream_state *)malloc(sizeof(ogg_stream_state));
         if (!ogg_os)
