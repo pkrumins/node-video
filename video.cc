@@ -141,6 +141,7 @@ public:
             if (!ret->IsUndefined()) return ret;
         }
         
+        int mod = frames%(keyFrameInterval-1);
         if (mod) return WriteFrame(data, mod);
         return Undefined();
     }
