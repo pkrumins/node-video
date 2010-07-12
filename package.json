@@ -1,6 +1,6 @@
 {
    "name": "video",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "main": "video",
    "description": "A C++ module for node.js that creates Theora/Ogg videos from RGB frames.",
    "keywords": [
