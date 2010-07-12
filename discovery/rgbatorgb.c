@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
     size_t n = fread(rgba_buf, sizeof(unsigned char), rgba_size, input);
     if (n != rgba_size) {
-        printf("Didn't read %d bytes (width*height*4)\n", rgba_size);
+        printf("Didn't read %d bytes (width*height*4), read %d\n", rgba_size, n);
         exit(1);
     }
 
