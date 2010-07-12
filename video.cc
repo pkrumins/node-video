@@ -32,26 +32,6 @@ yuv_clamp(double d)
 }
 
 static unsigned char *
-rgba_to_yuv(const unsigned char *rgba, size_t size)
-{
-    unsigned char r, g, b;
-    unsigned char *yuv = (unsigned char *)malloc(size*3/4);
-    if (!yuv) return NULL;
-
-    for (size_t i=0, j=0; i<size; i+=4, j+=3) {
-        r = rgba[i];
-        g = rgba[i+1];
-        b = rgba[i+2];
-
-        yuv[j] = yuv_clamp(0.299 * r + 0.587 * g + 0.114 * b);
-        yuv[j+1] = yuv_clamp((0.436 * 255 - 0.14713 * r - 0.28886 * g + 0.436 * b) / 0.872);
-        yuv[j+2] = yuv_clamp((0.615 * 255 + 0.615 * r - 0.51499 * g - 0.10001 * b) / 1.230);
-    }
-
-    return yuv;
-}
-
-static unsigned char *
 rgb_to_yuv(const unsigned char *rgb, size_t size)
 {
     unsigned char r, g, b;
@@ -254,7 +234,7 @@ private:
     }
 
     Handle<Value>
-    WriteFrame(const unsigned char *rgba, int dupCount=0)
+    WriteFrame(const unsigned char *rgb, int dupCount=0)
     {
         HandleScope scope;
 
@@ -273,9 +253,9 @@ private:
         unsigned int x;
         unsigned int y;
 
-        yuv = rgba_to_yuv(rgba, width*height*4);
+        yuv = rgb_to_yuv(rgb, width*height*3);
         if (!yuv)
-            return VException("malloc failed in rgba_to_yuv");
+            return VException("malloc failed in rgb_to_yuv");
 
         yuv_w = (width + 15) & ~15;
         yuv_h = (height + 15) & ~15;
@@ -478,10 +458,10 @@ protected:
         if (!Buffer::HasInstance(args[0])) 
             return VException("First argument must be Buffer.");
 
-        Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+        Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
 
         FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
-        fv->NewFrame((unsigned char *)rgba->data());
+        fv->NewFrame((unsigned char *)rgb->data());
 
         return Undefined();
     }
@@ -598,7 +578,7 @@ private:
         typedef std::vector<unsigned char> Rect;
         Rect rect;
         Update(unsigned char *rrect, int xx, int yy, int ww, int hh) :
-            rect(rrect, rrect+(ww*hh*4)), x(xx), y(yy), w(ww), h(hh) {}
+            rect(rrect, rrect+(ww*hh*3)), x(xx), y(yy), w(ww), h(hh) {}
     };
 
     typedef std::vector<Update> VectorUpdate;
@@ -636,7 +616,7 @@ public:
         HandleScope scope;
 
         if (!lastFrame) {
-            lastFrame = (unsigned char *)malloc(width*height*4);
+            lastFrame = (unsigned char *)malloc(width*height*3);
             if (!lastFrame)
                 return VException("malloc failed in StackedVideo::NewFrame.");
         }
@@ -646,7 +626,7 @@ public:
 
         videoEncoder.newFrame(data);
 
-        memcpy(lastFrame, data, width*height*4);
+        memcpy(lastFrame, data, width*height*3);
         lastTimeStamp = timeStamp;
 
         return Undefined();
@@ -659,10 +639,10 @@ public:
 
         if (!lastFrame) {
            if (x==0 && y==0 && w==width && h==height) {
-               lastFrame = (unsigned char *)malloc(width*height*4);
+               lastFrame = (unsigned char *)malloc(width*height*3);
                if (!lastFrame) 
                    return VException("malloc failed in StackedVideo::Push.");
-               memcpy(lastFrame, rect, width*height*4);
+               memcpy(lastFrame, rect, width*height*3);
                return Undefined();
             }
             return VException("The first full frame was not pushed.");
@@ -690,13 +670,12 @@ public:
         {
             const Update &update = *it;
 
-            int start = (update.y)*width*4 + (update.x)*4;
+            int start = (update.y)*width*3 + (update.x)*3;
             for (int i = 0; i < update.h; i++) {
-                for (int j = 0; j < 4*(update.w); j+=4) {
-                    lastFrame[start + i*width*4 + j] = update.rect[i*(update.w)*4 + j];
-                    lastFrame[start + i*width*4 + j + 1] = update.rect[i*(update.w)*4 + j + 1];
-                    lastFrame[start + i*width*4 + j + 2] = update.rect[i*(update.w)*4 + j + 2];
-                    lastFrame[start + i*width*4 + j + 3] = update.rect[i*(update.w)*4 + j + 3];
+                for (int j = 0; j < 3*(update.w); j+=3) {
+                    lastFrame[start + i*width*3 + j] = update.rect[i*(update.w)*3 + j];
+                    lastFrame[start + i*width*3 + j + 1] = update.rect[i*(update.w)*3 + j + 1];
+                    lastFrame[start + i*width*3 + j + 2] = update.rect[i*(update.w)*3 + j + 2];
                 }
             }
         }
@@ -777,10 +756,10 @@ protected:
                 return VException("Timestamp can't be negative.");
         }
 
-        Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+        Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        sv->NewFrame((unsigned char *)rgba->data(), timeStamp);
+        sv->NewFrame((unsigned char *)rgb->data(), timeStamp);
 
         return Undefined();
     }
@@ -805,7 +784,7 @@ protected:
             return VException("Fifth argument must be integer height.");
 
         StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-        Buffer *rgba = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+        Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
         int x = args[1]->Int32Value();
         int y = args[2]->Int32Value();
         int w = args[3]->Int32Value();
@@ -828,7 +807,7 @@ protected:
         if (y+h > sv->height) 
             return VException("Pushed buffer exceeds StackedVideo's height.");
 
-        sv->Push((unsigned char *)rgba->data(), x, y, w, h);
+        sv->Push((unsigned char *)rgb->data(), x, y, w, h);
 
         return Undefined();
     }

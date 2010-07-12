@@ -1,5 +1,5 @@
-This is a node.js module, writen in C++, that produces theora video from the
-given RGB/RGBA buffers. The module may get more video formats in the future.
+This is a node.js module, writen in C++, that produces Theora/Ogg videos from
+the given RGB buffers.
 
 It was written by Peteris Krumins (peter@catonmat.net).
 His blog is at http://www.catonmat.net  --  good coders code, great reuse.
@@ -55,9 +55,9 @@ Important: All of the above options should be set before submitting the first
 frame.
 
 Now, to start writing video, call `newFrame` method with frames sequentially.
-Frames must be RGBA nodejs Buffer objects.
+Frames must be RGB nodejs Buffer objects.
 
-    video.newFrame(rgba_frame);
+    video.newFrame(rgb_frame);
 
 FixedVideo is lazy by itself and will write headers of the video only after
 receiving the first frame, so the first frame may take longer to encode than
@@ -99,12 +99,12 @@ Then set the quality, framerate, keyframe interval, via `setQuality`,
 Now you have to submit a full frame to StackedVideo, do it via regular
 `newFrame` method:
 
-    stackedVideo.newFrame(rgba_frame);
+    stackedVideo.newFrame(rgb_frame);
 
 This will encode this frame, and remember it. Now you can use `push` method
 to push an update to the frame. The usage is as following:
 
-    stackedVideo.push(rgba_rectangle, x, y, width, height);
+    stackedVideo.push(rgb_rectangle, x, y, width, height);
 
 This will put the rectangle of width x height at position (x, y). Make sure
 dimensions don't overflow or you'll get an exception. You can also push the
@@ -116,6 +116,17 @@ will encode the frame (and keep the previous frame in memory, so you can `push`
 more stuff):
 
     stackedVideo.endPush();
+
+Stacked videos can also duplicate previous frames cheaply to imitate VFR (variable
+frame rate). Pass millisecond argument to `endPush` to make it duplicate the previous
+for the right amount of time. Here is what I mean,
+
+If you call,
+
+    stackedVideo.endPush((new Date).getTime());
+
+every time, then the previous frame will be duplicated the right number of times
+so that video played at the right framerate.
 
 When you're totally done with encoding, call the `end` method:
 
