@@ -19,7 +19,7 @@ def configure(conf):
 def build(bld):
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.target = "video"
-  obj.source = "video.cc"
+  obj.source = "src/common.cpp src/video_encoder.cpp src/fixed_video.cpp src/stacked_video.cpp src/module.cpp"
   obj.uselib = "OGG THEORAENC THEORADEC"
 
 def shutdown():
