@@ -2,6 +2,9 @@
 #include <cstdio>
 #include <cerrno>
 #include <cmath>
+
+#include "loki/ScopeGuard.h"
+
 #include "common.h"
 #include "video_encoder.h"
 
@@ -231,6 +234,7 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     unsigned int y;
 
     yuv = rgb_to_yuv(rgb, width*height*3);
+    LOKI_ON_BLOCK_EXIT(free, yuv);
     if (!yuv)
         return VException("malloc failed in rgb_to_yuv");
 
@@ -248,23 +252,19 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     ycbcr[2].height = ycbcr[1].height;
 
     yuv_y = (unsigned char*)malloc(ycbcr[0].stride * ycbcr[0].height);
-    if (!yuv_y) {
-        free(yuv);
+    LOKI_ON_BLOCK_EXIT(free, yuv_y);
+    if (!yuv_y)
         return VException("malloc failed in WriteFrame for yuv_y");
-    }
+
     yuv_u = (unsigned char*)malloc(ycbcr[1].stride * ycbcr[1].height);
-    if (!yuv_u) {
-        free(yuv);
-        free(yuv_y);
+    LOKI_ON_BLOCK_EXIT(free, yuv_u);
+    if (!yuv_u)
         return VException("malloc failed in WriteFrame for yuv_u");
-    }
+
     yuv_v = (unsigned char*)malloc(ycbcr[2].stride * ycbcr[2].height);
-    if (!yuv_u) {
-        free(yuv);
-        free(yuv_y);
-        free(yuv_u);
+    LOKI_ON_BLOCK_EXIT(free, yuv_v);
+    if (!yuv_u)
         return VException("malloc failed in WriteFrame for yuv_v");
-    }
 
     ycbcr[0].data = yuv_y;
     ycbcr[1].data = yuv_u;
@@ -305,31 +305,16 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
 
     if (dupCount > 0) {
         int ret = th_encode_ctl(td, TH_ENCCTL_SET_DUP_COUNT, &dupCount, sizeof(int));
-        if (ret) {
-            free(yuv);
-            free(yuv_y);
-            free(yuv_u);
-            free(yuv_v);
+        if (ret)
             return VException("th_encode_ctl failed for dupCount>0");
-        }
     }
 
-    if(th_encode_ycbcr_in(td, ycbcr)) {
-        free(yuv);
-        free(yuv_y);
-        free(yuv_u);
-        free(yuv_v);
+    if(th_encode_ycbcr_in(td, ycbcr))
         return VException("th_encode_ycbcr_in failed in WriteFrame");
-    }
 
     while (int ret = th_encode_packetout(td, 0, &op)) {
-        if (ret < 0) {
-            free(yuv);
-            free(yuv_y);
-            free(yuv_u);
-            free(yuv_v);
+        if (ret < 0)
             return VException("th_encode_packetout failed in WriteFrame");
-        }
         ogg_stream_packetin(ogg_os, &op);
         while(ogg_stream_pageout(ogg_os, &og)) {
             fwrite(og.header, og.header_len, 1, ogg_fp);
@@ -340,11 +325,6 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     ogg_stream_flush(ogg_os, &og);
     fwrite(og.header, og.header_len, 1, ogg_fp);
     fwrite(og.body, og.body_len, 1, ogg_fp);
-
-    free(yuv_y);
-    free(yuv_u);
-    free(yuv_v);
-    free(yuv);
 
     return Undefined();
 }
