@@ -2,7 +2,6 @@
 #define VIDEO_ENCODER_H
 
 #include <string>
-#include <node.h>
 #include <theora/theoraenc.h>
 
 class VideoEncoder {
@@ -23,8 +22,8 @@ public:
     VideoEncoder(int wwidth, int hheight);
     ~VideoEncoder();
 
-    v8::Handle<v8::Value> newFrame(const unsigned char *data);
-    v8::Handle<v8::Value> dupFrame(const unsigned char *data, int time);
+    void newFrame(const unsigned char *data);
+    void dupFrame(const unsigned char *data, int time);
     void setOutputFile(const char *fileName);
     void setQuality(int qquality);
     void setFrameRate(int fframeRate);
@@ -32,9 +31,10 @@ public:
     void end();
 
 private:
-    v8::Handle<v8::Value> InitTheora();
-    v8::Handle<v8::Value> WriteHeaders();
-    v8::Handle<v8::Value> WriteFrame(const unsigned char *rgb, int dupCount=0);
+    void InitTheora();
+    void WriteHeaders();
+    void WriteFrame(const unsigned char *rgb, int dupCount=0);
 };
 
 #endif
+

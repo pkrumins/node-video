@@ -16,7 +16,7 @@ static int chroma_format = TH_PF_420;
 static inline unsigned char
 yuv_clamp(double d)
 {
-    http://ochemonline.files.wordpress.com/2010/03/clamps.jpg
+    http://catonmat.net/ftp/clamps.jpg
     if(d < 0) return 0;
     if(d > 255) return 255;
     return d;
@@ -52,38 +52,29 @@ VideoEncoder::~VideoEncoder() {
     end();
 }
 
-Handle<Value>
+void
 VideoEncoder::newFrame(const unsigned char *data)
 {
-    HandleScope scope;
-    Handle<Value> ret;
-
     if (!frameCount) {
         if (outputFileName.empty())
-            return VException("No output means was set. Use setOutputFile to set it.");
+            throw "No output means was set. Use setOutputFile to set it.";
 
         ogg_fp = fopen(outputFileName.c_str(), "w+");
         if (!ogg_fp) {
             char error_msg[256];
             snprintf(error_msg, 256, "Could not open %s. Error: %s.",
                 outputFileName.c_str(), strerror(errno));
-            return VException(error_msg);
+            throw error_msg;
         }
 
-        ret = InitTheora();
-        if (!ret->IsUndefined()) return ret;
-
-        ret = WriteHeaders();
-        if (!ret->IsUndefined()) return ret;
+        InitTheora();
+        WriteHeaders();
     }
-    ret = WriteFrame(data);
-    if (!ret->IsUndefined()) return ret;
+    WriteFrame(data);
     frameCount++;
-
-    return Undefined();
 }
 
-Handle<Value>
+void
 VideoEncoder::dupFrame(const unsigned char *data, int time)
 {
     int frames = ceil((float)time*frameRate/1000);
@@ -91,16 +82,14 @@ VideoEncoder::dupFrame(const unsigned char *data, int time)
     int i;
 
     if (repetitions == 0)
-        return WriteFrame(data, frames);
+        WriteFrame(data, frames);
 
     for (i = 1; i<=repetitions; i++) {
-        Handle<Value> ret = WriteFrame(data, keyFrameInterval-1);
-        if (!ret->IsUndefined()) return ret;
+        WriteFrame(data, keyFrameInterval-1);
     }
     
     int mod = frames%(keyFrameInterval-1);
-    if (mod) return WriteFrame(data, mod);
-    return Undefined();
+    if (mod) WriteFrame(data, mod);
 }
 
 void
@@ -138,11 +127,9 @@ VideoEncoder::end()
     ogg_os = NULL;
 }
 
-Handle<Value>
+void
 VideoEncoder::InitTheora()
 {
-    HandleScope scope;
-
     th_info_init(&ti);
     ti.frame_width = ((width + 15) >> 4) << 4; // make sure width%16==0
     ti.frame_height = ((height + 15) >> 4) << 4;
@@ -168,27 +155,23 @@ VideoEncoder::InitTheora()
 
     ogg_os = (ogg_stream_state *)malloc(sizeof(ogg_stream_state));
     if (!ogg_os)
-        return VException("malloc failed in InitTheora for ogg_stream_state");
+        throw "malloc failed in InitTheora for ogg_stream_state";
 
     if (ogg_stream_init(ogg_os, rand()))
-        return VException("ogg_stream_init failed in InitTheora");
-
-    return Undefined();
+        throw "ogg_stream_init failed in InitTheora";
 }
 
-Handle<Value>
+void
 VideoEncoder::WriteHeaders()
 {
-    HandleScope scope;
-
     th_comment_init(&tc);
     if (th_encode_flushheader(td, &tc, &op) <= 0)
-        return VException("th_encode_flushheader failed in WriteHeaders");
+        throw "th_encode_flushheader failed in WriteHeaders";
     th_comment_clear(&tc);
 
     ogg_stream_packetin(ogg_os, &op);
     if (ogg_stream_pageout(ogg_os, &og)!=1)
-        return VException("ogg_stream_pageout failed in WriteHeaders");
+        throw "ogg_stream_pageout failed in WriteHeaders";
 
     fwrite(og.header,1,og.header_len,ogg_fp);
     fwrite(og.body,1,og.body_len,ogg_fp);
@@ -196,28 +179,26 @@ VideoEncoder::WriteHeaders()
     for (;;) {
         int ret = th_encode_flushheader(td, &tc, &op);
         if (ret<0)
-            return VException("th_encode_flushheader failed in WriteHeaders");
-        else if (ret == 0) break;
+            throw "th_encode_flushheader failed in WriteHeaders";
+        else if (ret == 0)
+            break;
         ogg_stream_packetin(ogg_os, &op);
     }
 
     for (;;) {
         int ret = ogg_stream_flush(ogg_os, &og);
         if (ret < 0)
-            return VException("ogg_stream_flush failed in WriteHeaders");
-        else if (ret == 0) break;
+            throw "ogg_stream_flush failed in WriteHeaders";
+        else if (ret == 0)
+            break;
         fwrite(og.header, 1, og.header_len, ogg_fp);
         fwrite(og.body, 1, og.body_len, ogg_fp);
     }
-
-    return Undefined();
 }
 
-Handle<Value>
+void
 VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
 {
-    HandleScope scope;
-
     th_ycbcr_buffer ycbcr;
     ogg_packet op;
     ogg_page og;
@@ -236,7 +217,7 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     yuv = rgb_to_yuv(rgb, width*height*3);
     LOKI_ON_BLOCK_EXIT(free, yuv);
     if (!yuv)
-        return VException("malloc failed in rgb_to_yuv");
+        throw "malloc failed in rgb_to_yuv";
 
     yuv_w = (width + 15) & ~15;
     yuv_h = (height + 15) & ~15;
@@ -254,17 +235,17 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     yuv_y = (unsigned char*)malloc(ycbcr[0].stride * ycbcr[0].height);
     LOKI_ON_BLOCK_EXIT(free, yuv_y);
     if (!yuv_y)
-        return VException("malloc failed in WriteFrame for yuv_y");
+        throw "malloc failed in WriteFrame for yuv_y";
 
     yuv_u = (unsigned char*)malloc(ycbcr[1].stride * ycbcr[1].height);
     LOKI_ON_BLOCK_EXIT(free, yuv_u);
     if (!yuv_u)
-        return VException("malloc failed in WriteFrame for yuv_u");
+        throw "malloc failed in WriteFrame for yuv_u";
 
     yuv_v = (unsigned char*)malloc(ycbcr[2].stride * ycbcr[2].height);
     LOKI_ON_BLOCK_EXIT(free, yuv_v);
     if (!yuv_u)
-        return VException("malloc failed in WriteFrame for yuv_v");
+        throw "malloc failed in WriteFrame for yuv_v";
 
     ycbcr[0].data = yuv_y;
     ycbcr[1].data = yuv_u;
@@ -306,15 +287,15 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     if (dupCount > 0) {
         int ret = th_encode_ctl(td, TH_ENCCTL_SET_DUP_COUNT, &dupCount, sizeof(int));
         if (ret)
-            return VException("th_encode_ctl failed for dupCount>0");
+            throw "th_encode_ctl failed for dupCount>0";
     }
 
     if(th_encode_ycbcr_in(td, ycbcr))
-        return VException("th_encode_ycbcr_in failed in WriteFrame");
+        throw "th_encode_ycbcr_in failed in WriteFrame";
 
     while (int ret = th_encode_packetout(td, 0, &op)) {
         if (ret < 0)
-            return VException("th_encode_packetout failed in WriteFrame");
+            throw "th_encode_packetout failed in WriteFrame";
         ogg_stream_packetin(ogg_os, &op);
         while(ogg_stream_pageout(ogg_os, &og)) {
             fwrite(og.header, og.header_len, 1, ogg_fp);
@@ -325,7 +306,5 @@ VideoEncoder::WriteFrame(const unsigned char *rgb, int dupCount)
     ogg_stream_flush(ogg_os, &og);
     fwrite(og.header, og.header_len, 1, ogg_fp);
     fwrite(og.body, og.body_len, 1, ogg_fp);
-
-    return Undefined();
 }
 
