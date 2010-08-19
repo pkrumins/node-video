@@ -25,6 +25,7 @@ var stackedVideo = new VideoLib.StackedVideo(720,400);
 stackedVideo.setOutputFile('video.ogv');
 
 chunkDirs.forEach(function (dir) {
+    console.log(dir);
     var chunkFiles = fs.readdirSync(dir).sort().filter(
         function (f) {
             return /^\d+-rgb-\d+-\d+-\d+-\d+.dat/.test(f);
