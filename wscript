@@ -19,8 +19,9 @@ def configure(conf):
 def build(bld):
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.target = "video"
-  obj.source = "src/common.cpp src/video_encoder.cpp src/fixed_video.cpp src/stacked_video.cpp src/module.cpp"
+  obj.source = "src/common.cpp src/video_encoder.cpp src/fixed_video.cpp src/stacked_video.cpp src/async_stacked_video.cpp src/utils.cpp src/module.cpp"
   obj.uselib = "OGG THEORAENC THEORADEC"
+  obj.cxxflags = obj.cxxflags = ["-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE"]
 
 def shutdown():
   if Options.commands['clean']:

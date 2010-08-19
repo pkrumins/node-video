@@ -2,6 +2,7 @@
 
 #include "fixed_video.h"
 #include "stacked_video.h"
+#include "async_stacked_video.h"
 
 extern "C" void
 init(v8::Handle<v8::Object> target)
@@ -10,5 +11,6 @@ init(v8::Handle<v8::Object> target)
 
     FixedVideo::Initialize(target);
     StackedVideo::Initialize(target);
+    AsyncStackedVideo::Initialize(target);
 }
 
