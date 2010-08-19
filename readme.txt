@@ -10,6 +10,7 @@ This module exports several objects that you can work with:
 
     * FixedVideo - to create videos from fixed size frames
     * StackedVideo - to create videos from fragmented frames (stack them together)
+    * AsyncStackedVideo - same as StackedVideo but asynchronous
 
     // these are not there yet, still hacking them in right now.
     // * StreamingVideo - to create streamable videos (works with HTML5 <video>)
@@ -134,6 +135,35 @@ When you're totally done with encoding, call the `end` method:
 
 That will close all the file handles and free memory. Alternatively you can let
 the `stackedVideo` object go out of scope, which will have the same effect.
+
+
+AsyncStackedVideo
+-----------------
+
+AsyncStackedVideo is the same as StackedVideo except it's asynchronous.
+
+    var asyncVideo = new AsyncStackedVideo(width, height);
+    asyncVideo.setOutputFile('./video.ogv');
+    
+To use it you must specify the temporary directory for fragments (it writes them
+asynchronously to disk):
+
+    asyncVideo.setTmpDir('/tmp/foo');
+
+Next you .push fragments to it, and after you're done with one frame,
+you call .endPush.
+
+Then when you're totally done with all the frames, call .encode and pass it a
+callback function, which will be called once the encoding is done:
+
+    asyncVideo.encode(function (ok, error) {
+        if (ok) {
+            // video was written to the file you set by .setOutputFile
+        }
+        else {
+            // failure, examine 'error'
+        }
+    });
 
 
 StreamingVideo
