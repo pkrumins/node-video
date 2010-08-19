@@ -94,11 +94,13 @@ StackedVideo::EndPush(unsigned long timeStamp)
         const Update &update = *it;
 
         int start = (update.y)*width*3 + (update.x)*3;
+        const unsigned char *updatep = &(update.rect[0]);
         for (int i = 0; i < update.h; i++) {
-            for (int j = 0; j < 3*(update.w); j+=3) {
-                lastFrame[start + i*width*3 + j] = update.rect[i*(update.w)*3 + j];
-                lastFrame[start + i*width*3 + j + 1] = update.rect[i*(update.w)*3 + j + 1];
-                lastFrame[start + i*width*3 + j + 2] = update.rect[i*(update.w)*3 + j + 2];
+            unsigned char *framep = lastFrame + start + i*width*3;
+            for (int j = 0; j < update.w; j++) {
+                *framep++ = *updatep++;
+                *framep++ = *updatep++;
+                *framep++ = *updatep++;
             }
         }
     }
