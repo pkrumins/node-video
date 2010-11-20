@@ -96,10 +96,10 @@ FixedVideo::NewFrame(const Arguments &args)
     if (!Buffer::HasInstance(args[0])) 
         return VException("First argument must be Buffer.");
 
-    Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
 
     FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
-    fv->NewFrame((unsigned char *)rgb->data());
+    fv->NewFrame((unsigned char *) Buffer::Data(rgb));
 
     return Undefined();
 }

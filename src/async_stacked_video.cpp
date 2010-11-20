@@ -199,7 +199,7 @@ AsyncStackedVideo::Push(const Arguments &args)
         return VException("Fifth argument must be integer height.");
 
     AsyncStackedVideo *video = ObjectWrap::Unwrap<AsyncStackedVideo>(args.This());
-    Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
     int x = args[1]->Int32Value();
     int y = args[2]->Int32Value();
     int w = args[3]->Int32Value();
@@ -223,7 +223,7 @@ AsyncStackedVideo::Push(const Arguments &args)
         return VException("Pushed buffer exceeds AsyncStackedVideo's height.");
 
     try {
-        video->Push((unsigned char *)rgb->data(), x, y, w, h);
+        video->Push((unsigned char *) Buffer::Data(rgb), x, y, w, h);
     }
     catch (const char *err) {
         return VException(err);
