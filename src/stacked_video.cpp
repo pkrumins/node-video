@@ -190,10 +190,10 @@ StackedVideo::NewFrame(const Arguments &args)
             return VException("Timestamp can't be negative.");
     }
 
-    Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
 
     StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-    sv->NewFrame((unsigned char *)rgb->data(), timeStamp);
+    sv->NewFrame((unsigned char *) Buffer::Data(rgb), timeStamp);
 
     return Undefined();
 }
@@ -218,7 +218,7 @@ StackedVideo::Push(const Arguments &args)
         return VException("Fifth argument must be integer height.");
 
     StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
-    Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
     int x = args[1]->Int32Value();
     int y = args[2]->Int32Value();
     int w = args[3]->Int32Value();
@@ -241,7 +241,7 @@ StackedVideo::Push(const Arguments &args)
     if (y+h > sv->height) 
         return VException("Pushed buffer exceeds StackedVideo's height.");
 
-    sv->Push((unsigned char *)rgb->data(), x, y, w, h);
+    sv->Push((unsigned char *) Buffer::Data(rgb), x, y, w, h);
 
     return Undefined();
 }
