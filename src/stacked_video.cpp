@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <node_buffer.h>
+#include <node_version.h>
 #include "common.h"
 #include "stacked_video.h"
 
@@ -190,10 +191,19 @@ StackedVideo::NewFrame(const Arguments &args)
             return VException("Timestamp can't be negative.");
     }
 
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
+#else
     Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+#endif
 
     StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    sv->NewFrame((unsigned char *) Buffer::Data(rgb), timeStamp);
+#else
     sv->NewFrame((unsigned char *)rgb->data(), timeStamp);
+#endif
 
     return Undefined();
 }
@@ -218,7 +228,11 @@ StackedVideo::Push(const Arguments &args)
         return VException("Fifth argument must be integer height.");
 
     StackedVideo *sv = ObjectWrap::Unwrap<StackedVideo>(args.This());
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
+#else
     Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+#endif
     int x = args[1]->Int32Value();
     int y = args[2]->Int32Value();
     int w = args[3]->Int32Value();
@@ -241,7 +255,11 @@ StackedVideo::Push(const Arguments &args)
     if (y+h > sv->height) 
         return VException("Pushed buffer exceeds StackedVideo's height.");
 
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    sv->Push((unsigned char *) Buffer::Data(rgb), x, y, w, h);
+#else
     sv->Push((unsigned char *)rgb->data(), x, y, w, h);
+#endif
 
     return Undefined();
 }

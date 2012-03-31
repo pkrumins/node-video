@@ -1,3 +1,4 @@
+
 This is a node.js module, writen in C++, that produces Theora/Ogg videos from
 the given RGB buffers.
 
@@ -15,9 +16,7 @@ This module exports several objects that you can work with:
     // these are not there yet, still hacking them in right now.
     // * StreamingVideo - to create streamable videos (works with HTML5 <video>)
 
-
-FixedVideo
-----------
+##FixedVideo
 
 FixedVideo object is for creating videos from fixed size frames. That is,
 each frame is exactly the same size, for example, each frame is 720x400 pixels.
@@ -73,8 +72,7 @@ to garbage collector. If `video` goes out of scope, it also closes the video
 file and frees all resources.
 
 
-StackedVideo
-------------
+##StackedVideo
 
 StackedVideo object is for stacking many small frame updates together and then
 encoding the frame as a whole. Here is how it works. The first frame sent to
@@ -137,8 +135,7 @@ That will close all the file handles and free memory. Alternatively you can let
 the `stackedVideo` object go out of scope, which will have the same effect.
 
 
-AsyncStackedVideo
------------------
+##AsyncStackedVideo
 
 AsyncStackedVideo is the same as StackedVideo except it's asynchronous.
 
@@ -166,14 +163,12 @@ callback function, which will be called once the encoding is done:
     });
 
 
-StreamingVideo
---------------
+##StreamingVideo
 
 Also coming near you soon. This is the most awesome stuff!
 
 
-How to compile?
----------------
+##How to compile?
 
 You need node.js installed to compile this module. When installed it comes with
 node-waf tool, run it in this libs dir:
@@ -183,9 +178,11 @@ node-waf tool, run it in this libs dir:
 This will produce video.node dll. After that, make sure NODE_PATH contains lib's
 dir. 
 
+## Installation
 
-Other stuff in this module
---------------------------
+    npm install node-video [-g]
+
+##Other stuff in this module
 
 The discovery/ directory contains all the snippets I wrote to understand how
 to get video working. It's a habit of effective hackers to try lots of small
@@ -207,3 +204,7 @@ Sincerely,
 Peteris Krumins
 http://www.catonmat.net
 
+## Contributors
+
+* Node v0.3 buffers (James Halliday substack)
+* Node v0.6 compatibility (Pascal Deschenes <pdeschen at gmail dot com>)
