@@ -1,4 +1,5 @@
 #include <node_buffer.h>
+#include <node_version.h>
 #include "common.h"
 #include "fixed_video.h"
 
@@ -95,11 +96,18 @@ FixedVideo::NewFrame(const Arguments &args)
 
     if (!Buffer::HasInstance(args[0])) 
         return VException("First argument must be Buffer.");
-
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    v8::Handle<v8::Object> rgb = args[0]->ToObject();
+#else
     Buffer *rgb = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+#endif
 
     FixedVideo *fv = ObjectWrap::Unwrap<FixedVideo>(args.This());
+#if NODE_VERSION_AT_LEAST(0,3,0)
+    fv->NewFrame((unsigned char *) Buffer::Data(rgb));
+#else
     fv->NewFrame((unsigned char *)rgb->data());
+#endif
 
     return Undefined();
 }
